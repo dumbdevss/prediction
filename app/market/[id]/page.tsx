@@ -12,6 +12,7 @@ import Header from "@/components/header"
 import { CustomProgress } from "@/components/ui/custom-progress"
 import { MarketDetailSkeleton } from "@/components/market-detail-skeleton"
 import { ArrowRight, CheckCircle, XCircle } from "lucide-react"
+import decodeUrlString from "@/utils/special"
 import aptos from "@/lib/aptos"
 
 interface Market {
@@ -54,20 +55,20 @@ export default function MarketDetail(): React.ReactElement {
   useEffect(() => {
     const fetchMarketData = async (): Promise<void> => {
       setIsLoading(true)
-      console.log(process.env.NEXT_PUBLIC_MODULE_ADDRESS)
+      console.log(decodeUrlString(marketId))
       const viewPayload: InputViewFunctionData = {
         function: `${process.env.NEXT_PUBLIC_MODULE_ADDRESS}::PredictionMarkets::get_market_by_question`,
-        functionArguments: [marketId],
+        functionArguments: [decodeUrlString(marketId)],
       }
 
       const predictionView: InputViewFunctionData = {
         function: `${process.env.NEXT_PUBLIC_MODULE_ADDRESS}::PredictionMarkets::get_prediction_counts`,
-        functionArguments: [marketId],
+        functionArguments: [decodeUrlString(marketId)],
       }
 
       const predictionOddsView: InputViewFunctionData = {
         function: `${process.env.NEXT_PUBLIC_MODULE_ADDRESS}::PredictionMarkets::get_prediction_odds`,
-        functionArguments: [marketId],
+        functionArguments: [decodeUrlString(marketId)],
       }
 
       try {
@@ -109,8 +110,6 @@ export default function MarketDetail(): React.ReactElement {
       return;
     }
 
-    setIsLoading(true);
-
     const transactionPayload: InputEntryFunctionData = {
       function: `${process.env.NEXT_PUBLIC_MODULE_ADDRESS}::PredictionMarkets::make_prediction`,
       functionArguments: [marketId, prediction === "yes"],
@@ -136,9 +135,7 @@ export default function MarketDetail(): React.ReactElement {
         alert("Failed to submit prediction. Please try again.");
       }
       
-    } finally {
-      setIsLoading(false);
-      
+    } finally {      
       // Reset form
       setPrediction(null);
       setAmount("");
