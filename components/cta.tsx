@@ -2,7 +2,7 @@ import TextBlur from "@/components/ui/text-blur";
 
 export default function CTA() {
   return (
-    <div className="flex w-full max-w-2xl flex-col gap-2">
+    <div className="flex w-full mt-10 lg:mt-0 max-w-2xl flex-col gap-2">
       <div>
         <TextBlur
           className="text-center text-3xl font-medium tracking-tighter sm:text-5xl"

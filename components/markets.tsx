@@ -128,7 +128,7 @@ export default function Markets() {
                   <p className="text-sm text-gray-500">Creator: {market?.creator_username}</p>
                   <p className="text-sm text-gray-500">Resolved: {market?.is_resolved ? "Yes" : "No"}</p>
                   <p className="text-sm text-gray-500">Outcome: {market?.outcome || "Pending"}</p>
-                  <Link href={`/market/${formatSentence(market?.question)}`}>
+                  <Link href={`/market/${formatSentence(market?.question)}`} prefetch={false}>
                     <Button className="mt-3 w-full">View Market</Button>
                   </Link>
                 </CardContent>

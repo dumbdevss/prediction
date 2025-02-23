@@ -1,5 +1,4 @@
 "use client"
-
 import type React from "react"
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
@@ -10,10 +9,10 @@ import { useWallet } from "@razorlabs/razorkit"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import Header from "@/components/header"
 import { CustomProgress } from "@/components/ui/custom-progress"
-import { MarketDetailSkeleton } from "@/components/market-detail-skeleton"
-import { ArrowRight, CheckCircle, XCircle } from "lucide-react"
+import { ArrowRight, CheckCircle, XCircle, Loader2 } from "lucide-react"
 import decodeUrlString from "@/utils/special"
 import aptos from "@/lib/aptos"
+import { useToast } from "@/lib/use-toast"
 
 interface Market {
   id: string
@@ -36,10 +35,18 @@ interface InputEntryFunctionData {
   functionArguments: any[]
 }
 
-// New type definitions for the view function results
 type MarketResult = [string, string, string, string, string, string]
 type PredictionCountsResult = [string, string]
 type PredictionOddsResult = [string, string]
+
+const LoadingOverlay = () => (
+  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="bg-white p-6 rounded-lg shadow-xl flex flex-col items-center">
+      <Loader2 className="h-8 w-8 animate-spin text-purple-600 mb-2" />
+      <p className="text-gray-800 font-medium">Processing your prediction...</p>
+    </div>
+  </div>
+);
 
 export default function MarketDetail(): React.ReactElement {
   const params = useParams()
@@ -49,13 +56,14 @@ export default function MarketDetail(): React.ReactElement {
   const [prediction, setPrediction] = useState<"yes" | "no" | null>(null)
   const [amount, setAmount] = useState<string>("")
   const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false)
   const [predictionCounts, setPredictionCounts] = useState<[string, string]>(['0', '0'])
   const [predictionOdds, setPredictionOdds] = useState<[string, string]>(['0', '0'])
+  const { toast, success, error: showerror } = useToast()
 
   useEffect(() => {
     const fetchMarketData = async (): Promise<void> => {
       setIsLoading(true)
-      console.log(decodeUrlString(marketId))
       const viewPayload: InputViewFunctionData = {
         function: `${process.env.NEXT_PUBLIC_MODULE_ADDRESS}::PredictionMarkets::get_market_by_question`,
         functionArguments: [decodeUrlString(marketId)],
@@ -88,12 +96,12 @@ export default function MarketDetail(): React.ReactElement {
           outcome: outcome === "true" ? true : outcome === "false" ? false : null,
         }
 
-        console.log(marketData)
         setMarket(marketData)
         setPredictionCounts(countsResult as [string, string])
         setPredictionOdds(oddsResult as [string, string])
       } catch (error) {
         console.error("Error fetching market data:", error)
+        showerror("Error fetching market data:");
       } finally {
         setIsLoading(false)
       }
@@ -106,13 +114,15 @@ export default function MarketDetail(): React.ReactElement {
     e.preventDefault();
     
     if (prediction === null) {
-      alert("Please select a prediction");
+      showerror("Please select a prediction");
       return;
     }
 
+    setIsSubmitting(true);
+
     const transactionPayload: InputEntryFunctionData = {
       function: `${process.env.NEXT_PUBLIC_MODULE_ADDRESS}::PredictionMarkets::make_prediction`,
-      functionArguments: [marketId, prediction === "yes"],
+      functionArguments: [decodeUrlString(marketId), prediction === "yes"],
     };
 
     try {
@@ -121,80 +131,94 @@ export default function MarketDetail(): React.ReactElement {
       });
       
       console.log(`Transaction submitted: https://explorer.movementlabs.xyz/txn/${response.hash}?network=bardock_testnet`);
-      
-      // Optional: Add a success message
-      alert("Prediction submitted successfully!")
+      success("Prediction submitted successfully!")
       
     } catch (error) {
       console.error("Error submitting transaction:", error);
-      
-      // Show a user-friendly error message
       if (error instanceof Error) {
-        alert(`Failed to submit prediction: ${error.message}`);
+        showerror(`Failed to submit prediction: ${error.message}`);
       } else {
-        alert("Failed to submit prediction. Please try again.");
+        showerror("Failed to submit prediction. Please try again.");
       }
-      
     } finally {      
-      // Reset form
+      setIsSubmitting(false);
       setPrediction(null);
       setAmount("");
     }
   }
 
   if (isLoading) {
-    return <MarketDetailSkeleton />
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="h-12 w-12 animate-spin text-purple-600 mx-auto mb-4" />
+          <p className="text-gray-600 text-lg">Loading market data...</p>
+        </div>
+      </div>
+    )
   }
 
   if (!market) {
-    return <div className="flex justify-center items-center h-screen">Market not found</div>
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center bg-red-50 p-6 rounded-lg">
+          <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-red-700 mb-2">Market Not Found</h2>
+          <p className="text-gray-600">The market you're looking for doesn't exist or has been removed.</p>
+        </div>
+      </div>
+    )
   }
 
   const totalPredictions = parseInt(predictionCounts[0] as string) + parseInt(predictionCounts[1] as string);
   const yesPercentage = (parseInt(predictionCounts[0] as string) / totalPredictions) * 100 || 0;
 
-
-
   return (
-    <main className="flex min-h-screen flex-col items-center overflow-x-clip pt-12 md:pt-24">
-      <section className="flex flex-col items-center px-4 sm:px-6 lg:px-8">
+    <main className="flex min-h-screen flex-col items-center overflow-x-clip pt-6 md:pt-12 lg:pt-24">
+      {isSubmitting && <LoadingOverlay />}
+      <section className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <Header />
-        <div className="container mx-auto px-4 py-8 max-w-3xl">
-          <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg shadow-lg p-6 mb-8">
-            <h1 className="text-3xl font-bold text-center truncate text-white mb-2">
+        <div className="max-w-3xl mt-16 mx-auto">
+          <div className="bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg shadow-lg p-4 sm:p-6 mb-6 sm:mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold text-center text-white mb-2 break-words">
               {market.question}
             </h1>
-            <p className="text-center text-gray-200">Created by: {market.creator_username}</p>
+            <p className="text-center text-gray-200 text-sm sm:text-base">Created by: {market.creator_username}</p>
           </div>
+          
           <Card className="overflow-hidden shadow-lg">
-            <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-500 text-white">
-              <CardTitle className="text-2xl">Market Details</CardTitle>
+            <CardHeader className="bg-gradient-to-r from-purple-500 to-pink-500 text-white p-4 sm:p-6">
+              <CardTitle className="text-xl sm:text-2xl">Market Details</CardTitle>
               <CardDescription className="text-gray-100">Predict the outcome</CardDescription>
             </CardHeader>
-            <CardContent className="p-6">
+            
+            <CardContent className="p-4 sm:p-6">
               <CustomProgress yesPercentage={yesPercentage} yesCount={parseInt(predictionCounts[0])} noCount={parseInt(predictionCounts[1])} />
-              <div className="grid grid-cols-2 gap-6 my-6">
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 my-4 sm:my-6">
                 <div className="bg-green-100 p-4 rounded-lg text-center">
-                  <p className="font-semibold text-lg mb-2 text-green-800">Yes</p>
-                  <p className="text-2xl font-bold text-green-600">{predictionOdds[0]}%</p>
-                  <p className="text-green-700">{predictionCounts[0]} predictions</p>
+                  <p className="font-semibold text-base sm:text-lg mb-2 text-green-800">Yes</p>
+                  <p className="text-xl sm:text-2xl font-bold text-green-600">{predictionOdds[0]}%</p>
+                  <p className="text-green-700 text-sm sm:text-base">{predictionCounts[0]} predictions</p>
                 </div>
                 <div className="bg-red-100 p-4 rounded-lg text-center">
-                  <p className="font-semibold text-lg mb-2 text-red-800">No</p>
-                  <p className="text-2xl font-bold text-red-600">{predictionOdds[1]}%</p>
-                  <p className="text-red-700">{predictionCounts[1]} predictions</p>
+                  <p className="font-semibold text-base sm:text-lg mb-2 text-red-800">No</p>
+                  <p className="text-xl sm:text-2xl font-bold text-red-600">{predictionOdds[1]}%</p>
+                  <p className="text-red-700 text-sm sm:text-base">{predictionCounts[1]} predictions</p>
                 </div>
               </div>
-              <p className="text-center mb-4 text-white">Total Predictions: {totalPredictions}</p>
+              
+              <p className="text-center mb-4 text-gray-600">Total Predictions: {totalPredictions}</p>
+              
               <div className="bg-gray-100 p-4 rounded-lg mb-6">
-                <p className="mb-2 text-gray-800">
+                <p className="mb-2 text-gray-800 text-sm sm:text-base">
                   <span className="font-semibold">Market Question:</span> {market.question}
                 </p>
-                <p className="mb-2 text-gray-800">
+                <p className="mb-2 text-gray-800 text-sm sm:text-base">
                   <span className="font-semibold">Resolved:</span> {market.is_resolved ? "Yes" : "No"}
                 </p>
                 {market.is_resolved && (
-                  <p className="text-gray-800">
+                  <p className="text-gray-800 text-sm sm:text-base">
                     <span className="font-semibold">Outcome:</span>{" "}
                     {market.outcome === null ? (
                       "Not set"
@@ -210,15 +234,17 @@ export default function MarketDetail(): React.ReactElement {
                   </p>
                 )}
               </div>
+              
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <Label className="text-lg font-semibold mb-2 text-white">Your Prediction</Label>
-                  <div className="flex gap-4 mt-2">
+                  <Label className="text-base sm:text-lg font-semibold mb-2 text-gray-800">Your Prediction</Label>
+                  <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 mt-2">
                     <Button
                       type="button"
                       variant={prediction === "yes" ? "default" : "outline"}
                       onClick={() => setPrediction("yes")}
-                      className="flex-1 py-6"
+                      className="flex-1 py-4 sm:py-6"
+                      disabled={isSubmitting}
                     >
                       Yes
                     </Button>
@@ -226,14 +252,16 @@ export default function MarketDetail(): React.ReactElement {
                       type="button"
                       variant={prediction === "no" ? "default" : "outline"}
                       onClick={() => setPrediction("no")}
-                      className="flex-1 py-6"
+                      className="flex-1 py-4 sm:py-6"
+                      disabled={isSubmitting}
                     >
                       No
                     </Button>
                   </div>
                 </div>
+                
                 <div>
-                  <Label htmlFor="amount" className="text-lg font-semibold mb-2 text-white">
+                  <Label htmlFor="amount" className="text-base sm:text-lg font-semibold mb-2 text-gray-800">
                     Amount
                   </Label>
                   <Input
@@ -242,11 +270,26 @@ export default function MarketDetail(): React.ReactElement {
                     value={amount}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setAmount(e.target.value)}
                     placeholder="Enter amount"
-                    className="text-lg py-6"
+                    className="text-base sm:text-lg py-4 sm:py-6"
+                    disabled={isSubmitting}
                   />
                 </div>
-                <Button type="submit" className="w-full py-6 text-lg">
-                  Submit Prediction <ArrowRight className="ml-2" size={20} />
+                
+                <Button 
+                  type="submit" 
+                  className="w-full py-4 sm:py-6 text-base sm:text-lg"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    <>
+                      Submit Prediction <ArrowRight className="ml-2" size={20} />
+                    </>
+                  )}
                 </Button>
               </form>
             </CardContent>
