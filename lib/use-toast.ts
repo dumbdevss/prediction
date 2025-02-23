@@ -1,6 +1,6 @@
 "use client"
 
-import { toast as sonnerToast, type Toast } from "sonner"
+import { toast as sonnerToast } from "sonner"
 
 type ToastProps = {
   title?: string
@@ -46,13 +46,13 @@ export function useToast() {
 
   return {
     toast,
-    success: (message: string, options?: Partial<Toast>) =>
+    success: (message: string, options?: Partial<any>) =>
       sonnerToast.success(message, options),
-    error: (message: string, options?: Partial<Toast>) =>
+    error: (message: string, options?: Partial<any>) =>
       sonnerToast.error(message, options),
-    warning: (message: string, options?: Partial<Toast>) =>
+    warning: (message: string, options?: Partial<any>) =>
       sonnerToast.warning(message, options),
-    info: (message: string, options?: Partial<Toast>) =>
+    info: (message: string, options?: Partial<any>) =>
       sonnerToast.info(message, options),
     promise: sonnerToast.promise,
     dismiss: sonnerToast.dismiss,
